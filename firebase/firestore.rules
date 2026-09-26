@@ -1,0 +1,108 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.role == 'admin' ||
+        getUserData().role == 'admin'
+      );
+    }
+
+    function isModerator() {
+      return isAuthenticated() && (
+        request.auth.token.role in ['admin', 'safety_moderator'] ||
+        getUserData().role in ['admin', 'safety_moderator']
+      );
+    }
+
+    // 1. Users Collection
+    // Users can read profiles; users can update their own personal info (name, phone, avatar, emergency contacts)
+    // CRITICAL: Users can NEVER escalate their own role or un-suspend their status!
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) &&
+        request.resource.data.role == 'user' &&
+        request.resource.data.status == 'active';
+      allow update: if (
+        // Self-update without role/status alteration
+        isOwner(userId) &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.status == resource.data.status
+      ) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // 2. Threat Reports Collection
+    // Community can file reports (starting as pending); only moderators/admins can verify or reject
+    match /reports/{reportId} {
+      allow read: if true;
+      allow create: if isAuthenticated() &&
+        request.resource.data.status == 'pending';
+      allow update: if isModerator() || (
+        // Report author can update description/photo only while still pending
+        isOwner(resource.data.userId) &&
+        resource.data.status == 'pending' &&
+        request.resource.data.status == 'pending'
+      );
+      allow delete: if isAdmin();
+    }
+
+    // 3. SOS Events Collection
+    // Any user (or guest) in distress can trigger SOS
+    match /sosEvents/{sosId} {
+      allow read: if isAuthenticated();
+      allow create: if true;
+      allow update: if isModerator();
+      allow delete: if isAdmin();
+    }
+
+    // 4. CCTV Cameras & CCTV Analysis
+    match /cctvCameras/{cameraId} {
+      allow read: if true;
+      allow write: if isModerator();
+    }
+
+    match /cctvAnalysis/{analysisId} {
+      allow read: if true;
+      allow create, update: if isModerator();
+      allow delete: if isAdmin();
+    }
+
+    // 5. Safety Zones & Routes
+    match /safetyZones/{zoneId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /routes/{routeId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // 6. System Settings & Audit Logs
+    match /systemSettings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /adminLogs/{logId} {
+      allow read: if isModerator();
+      allow create: if isAuthenticated();
+      allow update, delete: if false; // Immutable audit log
+    }
+  }
+}
