@@ -66,9 +66,9 @@ function simulateVisionInference(input: AnalysisInput): CCTVAnalysis {
   const isNight = currentHour >= 20 || currentHour <= 5;
 
   // Generate realistic detection metrics
-  let humanCount = (hash * 7) % 38 + 3; // 3 to 40 people
-  let crowdDensity = Math.min(95, Math.max(8, Math.round((humanCount / 40) * 100)));
-  let lighting = isNight ? Math.max(30, (hash * 13) % 65 + 30) : Math.max(70, (hash * 11) % 30 + 70);
+  const humanCount = (hash * 7) % 38 + 3; // 3 to 40 people
+  const crowdDensity = Math.min(95, Math.max(8, Math.round((humanCount / 40) * 100)));
+  const lighting = isNight ? Math.max(30, (hash * 13) % 65 + 30) : Math.max(70, (hash * 11) % 30 + 70);
 
   // Check for anomalies
   let anomalyDetected = false;
