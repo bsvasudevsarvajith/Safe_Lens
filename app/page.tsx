@@ -144,7 +144,7 @@ export default function HomePage() {
             </div>
 
             <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80">
-              <div className="text-3xl font-extrabold text-purple-400 uppercase text-2xl pt-1">
+              <div className="text-2xl font-extrabold text-purple-400 uppercase pt-1">
                 {metrics?.engineMode || 'Hybrid'}
               </div>
               <div className="text-xs text-slate-400 mt-1 flex items-center justify-center gap-1">

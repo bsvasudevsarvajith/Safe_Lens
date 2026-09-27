@@ -386,7 +386,7 @@ export async function logAdminAction(
     id: `log-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
     adminId,
     adminEmail,
-    action: category.replace('_', ' ').toUpperCase(),
+    action: category.replaceAll('_', ' ').toUpperCase(),
     category,
     details,
     timestamp: new Date().toISOString(),

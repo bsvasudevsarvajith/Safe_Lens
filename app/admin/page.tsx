@@ -306,7 +306,7 @@ export default function AdminDashboardPage() {
                         : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
                     }`}
                   >
-                    {mode.replace('_', ' ')}
+                    {mode.replaceAll('_', ' ')}
                   </button>
                 ))}
               </div>
@@ -327,7 +327,7 @@ export default function AdminDashboardPage() {
                     </div>
                   </div>
                   <span className="px-3 py-1 rounded-full text-[10px] font-extrabold uppercase bg-red-500/20 text-red-300 border border-red-500/30">
-                    {sos.status.replace('_', ' ')}
+                    {sos.status.replaceAll('_', ' ')}
                   </span>
                 </div>
               ))}
@@ -354,7 +354,7 @@ export default function AdminDashboardPage() {
                     </div>
 
                     <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-red-500/20 text-red-300 border border-red-500/30 self-start sm:self-auto">
-                      {sos.status.replace('_', ' ')}
+                      {sos.status.replaceAll('_', ' ')}
                     </span>
                   </div>
 
@@ -430,7 +430,7 @@ export default function AdminDashboardPage() {
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-white text-sm capitalize">{report.category.replace('_', ' ')}</span>
+                        <span className="font-bold text-white text-sm capitalize">{report.category.replaceAll('_', ' ')}</span>
                         <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30">
                           {report.severity}
                         </span>
@@ -445,7 +445,7 @@ export default function AdminDashboardPage() {
                       report.status === 'rejected' ? 'bg-red-500/20 text-red-300 border border-red-500/40' :
                       'bg-blue-500/20 text-blue-300 border border-blue-500/40'
                     }`}>
-                      {report.status.replace('_', ' ')}
+                      {report.status.replaceAll('_', ' ')}
                     </span>
                   </div>
 
@@ -625,7 +625,7 @@ export default function AdminDashboardPage() {
                       zone.type === 'police_patrol_sector' ? 'bg-blue-500/20 text-blue-400' :
                       'bg-red-500/20 text-red-400'
                     }`}>
-                      {zone.type.replace('_', ' ')}
+                      {zone.type.replaceAll('_', ' ')}
                     </span>
                   </div>
                   <p className="text-slate-400">{zone.description}</p>

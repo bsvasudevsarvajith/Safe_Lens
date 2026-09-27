@@ -160,7 +160,7 @@ function NavigationContent() {
               Safety-Ranked Routing
             </span>
             <span className="text-xs text-slate-400">
-              Active Engine: <strong className="text-emerald-400 capitalize">{engineMode.replace('_', ' ')}</strong>
+              Active Engine: <strong className="text-emerald-400 capitalize">{engineMode.replaceAll('_', ' ')}</strong>
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-white mt-1">Safe Route Navigation</h1>
@@ -331,7 +331,7 @@ function NavigationContent() {
                               ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
                               : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                           }`}>
-                            {route.tier.replace('_', ' ')}
+                            {route.tier.replaceAll('_', ' ')}
                           </span>
                           {route.recommended && (
                             <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400">

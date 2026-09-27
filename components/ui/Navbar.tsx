@@ -89,7 +89,7 @@ export default function Navbar() {
               className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-xs font-semibold rounded-xl border border-slate-700/60 transition"
             >
               <span className={`w-2 h-2 rounded-full ${isAdmin ? 'bg-amber-400' : isModerator ? 'bg-purple-400' : 'bg-emerald-400'}`} />
-              <span className="capitalize">{user?.role ? user.role.replace('_', ' ') : 'Guest'}</span>
+              <span className="capitalize">{user?.role ? user.role.replaceAll('_', ' ') : 'Guest'}</span>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
             </button>
 

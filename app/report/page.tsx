@@ -277,7 +277,7 @@ export default function ThreatReportPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-white capitalize">
-                        {report.category.replace('_', ' ')}
+                        {report.category.replaceAll('_', ' ')}
                       </span>
                       <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
                         report.severity === 'critical' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
@@ -297,7 +297,7 @@ export default function ThreatReportPage() {
                     }`}>
                       {isVerified && <ShieldCheck className="w-3 h-3" />}
                       {isPending && <Clock className="w-3 h-3" />}
-                      <span>{report.status.replace('_', ' ')}</span>
+                      <span>{report.status.replaceAll('_', ' ')}</span>
                     </span>
                   </div>
 

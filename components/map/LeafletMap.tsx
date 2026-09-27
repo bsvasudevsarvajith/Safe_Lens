@@ -51,10 +51,19 @@ export default function LeafletMap({
         zoomControl: true,
       });
 
-      // Sleek, high-contrast dark tile layer for safety visibility
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap',
+      const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+      const tileUrl = mapboxToken && mapboxToken.startsWith('pk.')
+        ? `https://api.mapbox.com/styles/v1/mapbox/navigation-night-v1/tiles/256/{z}/{x}/{y}@2x?access_token=${mapboxToken}`
+        : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+
+      const tileAttribution = mapboxToken && mapboxToken.startsWith('pk.')
+        ? '&copy; <a href="https://www.mapbox.com/">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        : '&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap';
+
+      L.tileLayer(tileUrl, {
+        attribution: tileAttribution,
         maxZoom: 19,
+        tileSize: 256,
       }).addTo(map);
 
       const layerGroup = L.layerGroup().addTo(map);
@@ -120,7 +129,7 @@ export default function LeafletMap({
 
       circle.bindPopup(`
         <div style="font-family: sans-serif; font-size: 13px; line-height: 1.4;">
-          <strong style="color: ${color}; text-transform: uppercase; font-size: 11px;">${zone.type.replace('_', ' ')}</strong>
+          <strong style="color: ${color}; text-transform: uppercase; font-size: 11px;">${zone.type.replaceAll('_', ' ')}</strong>
           <h4 style="margin: 4px 0 6px; font-weight: bold; color: #111827;">${zone.name}</h4>
           <p style="margin: 0; color: #4b5563; font-size: 12px;">${zone.description}</p>
           <div style="margin-top: 6px; font-weight: 600; font-size: 11px; color: #374151;">Safety Index: ${zone.baseScore}/100</div>
@@ -162,7 +171,7 @@ export default function LeafletMap({
           <div style="background: #fef2f2; color: #991b1b; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; display: inline-block;">
             ${threat.status.toUpperCase()} HAZARD
           </div>
-          <h4 style="margin: 6px 0 4px; font-size: 13px; font-weight: bold; color: #111;">${threat.category.replace('_', ' ').toUpperCase()}</h4>
+          <h4 style="margin: 6px 0 4px; font-size: 13px; font-weight: bold; color: #111;">${threat.category.replaceAll('_', ' ').toUpperCase()}</h4>
           <p style="margin: 0; font-size: 12px; color: #374151;">${threat.description}</p>
           <div style="margin-top: 6px; font-size: 10px; color: #6b7280;">Reported by ${threat.userName}</div>
         </div>

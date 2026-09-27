@@ -442,7 +442,7 @@ function ProfileContent() {
 
             {emergencyContacts.length > 0 && (
               <button
-                onClick={handleSaveProfile}
+                onClick={(e) => handleSaveProfile(e as unknown as React.FormEvent)}
                 disabled={saving}
                 className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-md transition"
               >
@@ -471,7 +471,7 @@ function ProfileContent() {
                       <span className="text-slate-400">• {new Date(sos.timestamp).toLocaleString()}</span>
                     </div>
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-red-500/20 text-red-300 border border-red-500/30">
-                      {sos.status.replace('_', ' ')}
+                      {sos.status.replaceAll('_', ' ')}
                     </span>
                   </div>
 
@@ -506,9 +506,9 @@ function ProfileContent() {
               myReports.map((rep) => (
                 <div key={rep.id} className="p-4 rounded-3xl bg-slate-900/70 border border-slate-800 space-y-2 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-white capitalize">{rep.category.replace('_', ' ')}</span>
+                    <span className="font-bold text-white capitalize">{rep.category.replaceAll('_', ' ')}</span>
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                      {rep.status.replace('_', ' ')}
+                      {rep.status.replaceAll('_', ' ')}
                     </span>
                   </div>
                   <p className="text-slate-300">{rep.description}</p>
