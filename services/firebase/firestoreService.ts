@@ -223,6 +223,7 @@ export async function createSOSEvent(params: {
   longitude: number;
   accuracyMeters: number;
   notifiedContacts: string[];
+  locationSource?: 'gps' | 'unavailable';
 }): Promise<SOSEvent> {
   const all = await getSOSEvents();
   const newSOS: SOSEvent = {
@@ -233,8 +234,9 @@ export async function createSOSEvent(params: {
     latitude: params.latitude,
     longitude: params.longitude,
     accuracyMeters: params.accuracyMeters,
+    locationSource: params.locationSource ?? 'gps',
     status: 'active',
-    mapLink: `https://maps.google.com/?q=${params.latitude},${params.longitude}`,
+    mapLink: params.locationSource === 'unavailable' ? '' : `https://maps.google.com/?q=${params.latitude},${params.longitude}`,
     notifiedContacts: params.notifiedContacts,
     timestamp: new Date().toISOString(),
   };
@@ -246,7 +248,9 @@ export async function createSOSEvent(params: {
     params.userId,
     params.userName,
     'sos_dispatch',
-    `CRITICAL: SOS Alert triggered at ${params.latitude.toFixed(4)}, ${params.longitude.toFixed(4)}`
+    params.locationSource === 'unavailable'
+      ? `CRITICAL: SOS Alert triggered — GPS LOCATION UNAVAILABLE, contact caller at ${params.userPhone}`
+      : `CRITICAL: SOS Alert triggered at ${params.latitude.toFixed(4)}, ${params.longitude.toFixed(4)}`
   );
 
   return newSOS;
@@ -326,10 +330,11 @@ export async function updateUserSelfProfile(
   // Explicit whitelist to block role/status escalation
   users[idx] = {
     ...users[idx],
-    displayName: updates.displayName || users[idx].displayName,
-    phoneNumber: updates.phoneNumber || users[idx].phoneNumber,
-    photoURL: updates.photoURL || users[idx].photoURL,
-    emergencyContacts: updates.emergencyContacts || users[idx].emergencyContacts,
+    // displayName must not be blank; the other fields may be cleared with ''
+    displayName: updates.displayName?.trim() || users[idx].displayName,
+    phoneNumber: updates.phoneNumber ?? users[idx].phoneNumber,
+    photoURL: updates.photoURL ?? users[idx].photoURL,
+    emergencyContacts: updates.emergencyContacts ?? users[idx].emergencyContacts,
     updatedAt: new Date().toISOString(),
   };
 

@@ -6,36 +6,42 @@ import { calculateHaversineDistance } from '@/services/routingService';
 
 const ACTIVE_JOURNEY_KEY = 'sr_active_journey';
 const COMPLETED_TRIPS_KEY = 'sr_completed_trips';
+const ACTIVE_ROUTE_KEY = 'sr_active_route_data';
 
 export function useActiveJourney() {
   const [journey, setJourney] = useState<ActiveJourney | null>(null);
   const [activeRoute, setActiveRoute] = useState<NavigationRoute | null>(null);
   const [isSimulating, setIsSimulating] = useState<boolean>(true);
   const simulationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Becomes true once the saved journey has been read from localStorage.
+  // Until then the save effect must not run, or it would wipe the stored data.
+  const [hydrated, setHydrated] = useState(false);
 
   // Load from local storage on mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
       const savedJourney = localStorage.getItem(ACTIVE_JOURNEY_KEY);
-      const savedRoute = localStorage.getItem('sr_active_route_data');
+      const savedRoute = localStorage.getItem(ACTIVE_ROUTE_KEY);
       if (savedJourney) setJourney(JSON.parse(savedJourney));
       if (savedRoute) setActiveRoute(JSON.parse(savedRoute));
     } catch (e) {
       console.error('Error reading active journey:', e);
     }
+    setHydrated(true);
   }, []);
 
   // Save changes
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !hydrated) return;
     if (journey) {
       localStorage.setItem(ACTIVE_JOURNEY_KEY, JSON.stringify(journey));
+      if (activeRoute) localStorage.setItem(ACTIVE_ROUTE_KEY, JSON.stringify(activeRoute));
     } else {
       localStorage.removeItem(ACTIVE_JOURNEY_KEY);
-      localStorage.removeItem('sr_active_route_data');
+      localStorage.removeItem(ACTIVE_ROUTE_KEY);
     }
-  }, [journey]);
+  }, [journey, activeRoute, hydrated]);
 
   // Start new journey
   const startJourney = useCallback((
@@ -75,7 +81,7 @@ export function useActiveJourney() {
 
     if (typeof window !== 'undefined') {
       localStorage.setItem(ACTIVE_JOURNEY_KEY, JSON.stringify(newJourney));
-      localStorage.setItem('sr_active_route_data', JSON.stringify(route));
+      localStorage.setItem(ACTIVE_ROUTE_KEY, JSON.stringify(route));
     }
 
     return newJourney;

@@ -17,6 +17,10 @@ export const isFirebaseConfigured = Boolean(
   process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
 );
 
+// Demo mode: no real authentication backend. Persona switching and password-less
+// local login are ONLY allowed here. Never deploy publicly in demo mode.
+export const isDemoMode = !isFirebaseConfigured;
+
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let db: Firestore | null = null;

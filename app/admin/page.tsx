@@ -35,7 +35,6 @@ import {
   getAdminLogs,
   subscribeToStore,
 } from '@/services/firebase/firestoreService';
-import { analyzeCCTVFeed } from '@/services/aiCctvService';
 import {
   LayoutDashboard,
   ShieldAlert,
@@ -61,7 +60,14 @@ import {
 
 export default function AdminDashboardPage() {
   const router = useRouter();
-  const { user, isModerator, isAdmin } = useAuth();
+  const { user, loading: authLoading, isModerator, isAdmin } = useAuth();
+
+  // Access guard: only moderators/admins may use this dashboard
+  useEffect(() => {
+    if (!authLoading && !isModerator) {
+      router.replace('/auth/login?redirect=/admin');
+    }
+  }, [authLoading, isModerator, router]);
 
   // Tab state
   const [activeTab, setActiveTab] = useState<
@@ -107,6 +113,7 @@ export default function AdminDashboardPage() {
   }, []);
 
   useEffect(() => {
+    if (!isModerator) return;
     loadDashboardData();
 
     // Subscribe to live updates
@@ -120,7 +127,7 @@ export default function AdminDashboardPage() {
     return () => {
       unsubs.forEach(u => u());
     };
-  }, [loadDashboardData]);
+  }, [loadDashboardData, isModerator]);
 
   // Threat review action
   const handleModerateThreat = async (
@@ -147,12 +154,22 @@ export default function AdminDashboardPage() {
     setAnalyzingCamId(cam.id);
     setAiFeedback(null);
     try {
-      const analysis = await analyzeCCTVFeed({
-        cameraId: cam.id,
-        cameraCode: cam.cameraCode,
-        sourceType: customInputType,
-        dataUrlOrStream: cam.streamUrl,
+      // Runs on the server so the AI API key never reaches the browser
+      const res = await fetch('/api/cctv/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cameraId: cam.id,
+          cameraCode: cam.cameraCode,
+          sourceType: customInputType,
+          dataUrlOrStream: cam.streamUrl,
+        }),
       });
+      if (!res.ok) {
+        setAiFeedback(`AI analysis failed (${res.status}).`);
+        return;
+      }
+      const analysis: CCTVAnalysis = await res.json();
 
       await updateCameraAnalysis(cam.id, analysis);
       setAiFeedback(`AI analysis complete: ${analysis.humanCount} pedestrians detected. Lighting ${analysis.lightingScore}/100.`);
@@ -164,16 +181,25 @@ export default function AdminDashboardPage() {
 
   // Switch engine mode
   const handleSwitchEngine = async (mode: SafetyEngineMode) => {
-    if (!settings) return;
+    if (!settings || !isAdmin) return;
     await updateSystemSettings({ engineMode: mode }, user?.email);
     await loadDashboardData();
   };
 
   // User role/status update
   const handleUpdateUserRole = async (targetUid: string, role: any, status: any) => {
+    if (!isAdmin) return;
     await adminUpdateUser(targetUid, { role, status }, user?.email || 'admin@safecity.org');
     await loadDashboardData();
   };
+
+  if (authLoading || !isModerator) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-16 text-center text-slate-400 text-sm">
+        {authLoading ? 'Checking access…' : 'Access denied. Redirecting to sign in…'}
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1 flex flex-col">
@@ -210,10 +236,10 @@ export default function AdminDashboardPage() {
           { id: 'threats', label: `Threat Moderation (${threats.filter(t => t.status === 'pending' || t.status === 'under_review').length})`, icon: AlertTriangle },
           { id: 'cctv', label: `AI CCTV Surveillance (${cameras.length})`, icon: Video },
           { id: 'zones', label: `Safety Zones (${zones.length})`, icon: MapPin },
-          { id: 'users', label: `Users & Roles (${usersList.length})`, icon: Users },
-          { id: 'settings', label: 'Engine & Hotlines', icon: Settings },
+          { id: 'users', label: `Users & Roles (${usersList.length})`, icon: Users, adminOnly: true },
+          { id: 'settings', label: 'Engine & Hotlines', icon: Settings, adminOnly: true },
           { id: 'logs', label: 'Audit Trail', icon: FileText },
-        ].map((tab) => {
+        ].filter((tab) => !('adminOnly' in tab) || isAdmin).map((tab) => {
           const Icon = tab.icon;
           const active = activeTab === tab.id;
           return (
@@ -323,7 +349,7 @@ export default function AdminDashboardPage() {
                     </div>
                     <div>
                       <div className="font-bold text-white">{sos.userName} ({sos.userPhone})</div>
-                      <div className="text-slate-400 text-[11px]">{sos.latitude.toFixed(4)}, {sos.longitude.toFixed(4)} • {new Date(sos.timestamp).toLocaleTimeString()}</div>
+                      <div className="text-slate-400 text-[11px]">{sos.locationSource === 'unavailable' ? 'NO GPS FIX' : `${sos.latitude.toFixed(4)}, ${sos.longitude.toFixed(4)}`} • {new Date(sos.timestamp).toLocaleTimeString()}</div>
                     </div>
                   </div>
                   <span className="px-3 py-1 rounded-full text-[10px] font-extrabold uppercase bg-red-500/20 text-red-300 border border-red-500/30">
@@ -361,16 +387,22 @@ export default function AdminDashboardPage() {
                   <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <MapPin className="w-4 h-4 text-emerald-400" />
-                      <span className="font-mono text-slate-300">{sos.latitude.toFixed(5)}, {sos.longitude.toFixed(5)} (±{Math.round(sos.accuracyMeters)}m)</span>
+                      {sos.locationSource === 'unavailable' ? (
+                        <span className="font-mono text-red-400">GPS unavailable — call {sos.userPhone}</span>
+                      ) : (
+                        <span className="font-mono text-slate-300">{sos.latitude.toFixed(5)}, {sos.longitude.toFixed(5)} (±{Math.round(sos.accuracyMeters)}m)</span>
+                      )}
                     </div>
-                    <a
-                      href={sos.mapLink}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-blue-400 font-bold hover:underline"
-                    >
-                      View on Google Maps
-                    </a>
+                    {sos.mapLink && (
+                      <a
+                        href={sos.mapLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-blue-400 font-bold hover:underline"
+                      >
+                        View on Google Maps
+                      </a>
+                    )}
                   </div>
 
                   {sos.notifiedContacts.length > 0 && (
@@ -640,7 +672,7 @@ export default function AdminDashboardPage() {
         )}
 
         {/* TAB 6: USERS & ROLES */}
-        {activeTab === 'users' && (
+        {isAdmin && activeTab === 'users' && (
           <div className="space-y-4">
             <h3 className="text-lg font-bold text-white">Registered Users & Role Management</h3>
             <div className="space-y-3">
@@ -678,7 +710,7 @@ export default function AdminDashboardPage() {
         )}
 
         {/* TAB 7: SETTINGS & HOTLINES */}
-        {activeTab === 'settings' && (
+        {isAdmin && activeTab === 'settings' && (
           <div className="max-w-2xl space-y-6">
             <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-4 text-xs">
               <h3 className="text-base font-bold text-white">Emergency Services Telephone Hotlines</h3>

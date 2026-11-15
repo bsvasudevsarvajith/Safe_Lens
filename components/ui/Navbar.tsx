@@ -19,7 +19,7 @@ import SOSButton from '@/components/sos/SOSButton';
 
 export default function Navbar() {
   const pathname = usePathname();
-  const { user, isModerator, isAdmin, switchUserPersona, logout } = useAuth();
+  const { user, isModerator, isAdmin, isDemoMode, switchUserPersona, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [personaOpen, setPersonaOpen] = useState(false);
 
@@ -85,7 +85,7 @@ export default function Navbar() {
           {/* Quick Persona Switcher for demonstration */}
           <div className="relative">
             <button
-              onClick={() => setPersonaOpen(!personaOpen)}
+              onClick={() => isDemoMode && setPersonaOpen(!personaOpen)}
               className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-xs font-semibold rounded-xl border border-slate-700/60 transition"
             >
               <span className={`w-2 h-2 rounded-full ${isAdmin ? 'bg-amber-400' : isModerator ? 'bg-purple-400' : 'bg-emerald-400'}`} />
@@ -93,7 +93,7 @@ export default function Navbar() {
               <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
             </button>
 
-            {personaOpen && (
+            {isDemoMode && personaOpen && (
               <div className="absolute right-0 mt-2 w-52 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-2 z-50 animate-in fade-in">
                 <div className="px-2.5 py-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                   Switch Active Persona
@@ -180,6 +180,7 @@ export default function Navbar() {
             </Link>
           </div>
 
+          {isDemoMode && (
           <div className="pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
             <span className="text-slate-400">Current Persona:</span>
             <div className="flex gap-1.5">
@@ -203,6 +204,7 @@ export default function Navbar() {
               </button>
             </div>
           </div>
+          )}
         </div>
       )}
     </header>

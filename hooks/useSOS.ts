@@ -16,9 +16,11 @@ export function useSOS() {
 
     try {
       // 1. Capture high-accuracy GPS coordinates
-      let latitude = 12.9716;
-      let longitude = 77.5946;
-      let accuracy = 10;
+      // Placeholder only: never presented as the caller's real position.
+      let latitude = 0;
+      let longitude = 0;
+      let accuracy = -1;
+      let locationSource: 'gps' | 'unavailable' = 'unavailable';
 
       if (typeof window !== 'undefined' && navigator.geolocation) {
         try {
@@ -32,15 +34,16 @@ export function useSOS() {
           latitude = position.coords.latitude;
           longitude = position.coords.longitude;
           accuracy = position.coords.accuracy;
-        } catch (posErr) {
-          console.warn('High precision GPS timed out, using latest fallback coords');
+          locationSource = 'gps';
+        } catch {
+          console.warn('GPS unavailable for SOS; sending alert without a location fix');
         }
       }
 
       // 2. Format notified contacts
-      const notified = user?.emergencyContacts
+      const notified = (user?.emergencyContacts ?? [])
         .filter(c => c.notifyOnSOS)
-        .map(c => `${c.name} (${c.relationship}): ${c.phone}`) || [];
+        .map(c => `${c.name} (${c.relationship}): ${c.phone}`);
 
       // 3. Log event to Firestore / system
       const event = await createSOSEvent({
@@ -51,10 +54,15 @@ export function useSOS() {
         longitude,
         accuracyMeters: accuracy,
         notifiedContacts: notified,
+        locationSource,
       });
 
       setActiveSOS(event);
-      setFeedbackMessage('Emergency SOS Activated. Location transmitted to Emergency Command Center & Contacts.');
+      setFeedbackMessage(
+        locationSource === 'gps'
+          ? 'Emergency SOS recorded with your GPS location. Call 112 now if you are in danger.'
+          : 'SOS recorded but your location could NOT be determined. Call 112 now and tell them where you are.'
+      );
 
       // 4. Check if auto-dial is enabled in settings
       const settings = await getSystemSettings();
@@ -64,9 +72,9 @@ export function useSOS() {
       }
 
       return event;
-    } catch (err: any) {
+    } catch (err) {
       console.error('SOS activation error:', err);
-      setFeedbackMessage('SOS recorded locally. Transmitting to emergency dispatch.');
+      setFeedbackMessage('SOS could not be sent. Call 112 immediately.');
     } finally {
       setIsActivating(false);
     }

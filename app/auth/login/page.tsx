@@ -9,8 +9,10 @@ import { Shield, Lock, Mail, ArrowRight, Loader2, Sparkles } from 'lucide-react'
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectUrl = searchParams.get('redirect') || '/navigation';
-  const { login, switchUserPersona } = useAuth();
+  const rawRedirect = searchParams.get('redirect') || '/navigation';
+  // Only allow same-site paths, to prevent open redirects like ?redirect=//evil.com
+  const redirectUrl = rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : '/navigation';
+  const { login, switchUserPersona, isDemoMode } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -106,7 +108,8 @@ function LoginForm() {
         </button>
       </form>
 
-      {/* Quick Demo Personas */}
+      {/* Quick Demo Personas (demo mode only) */}
+      {isDemoMode && (
       <div className="pt-4 border-t border-slate-800 text-center">
         <span className="text-[11px] font-semibold text-slate-400 flex items-center justify-center gap-1 mb-2.5">
           <Sparkles className="w-3.5 h-3.5 text-amber-400" />
@@ -133,6 +136,7 @@ function LoginForm() {
           </button>
         </div>
       </div>
+      )}
 
       <div className="text-center text-xs text-slate-400">
         Don&apos;t have an account?{' '}
