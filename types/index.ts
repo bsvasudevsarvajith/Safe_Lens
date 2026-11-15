@@ -159,6 +159,8 @@ export interface SOSEvent {
   latitude: number;
   longitude: number;
   accuracyMeters: number;
+  // 'gps' = real device fix; 'unavailable' = GPS failed and the coordinates are a placeholder
+  locationSource?: 'gps' | 'unavailable';
   status: SOSEventStatus;
   mapLink: string;
   notifiedContacts: string[];

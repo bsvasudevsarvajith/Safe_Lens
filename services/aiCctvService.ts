@@ -1,4 +1,4 @@
-import { CCTVAnalysis, CCTVCamera } from '@/types';
+import { CCTVAnalysis } from '@/types';
 
 export interface AnalysisInput {
   cameraId: string;
@@ -9,9 +9,10 @@ export interface AnalysisInput {
 }
 
 export async function analyzeCCTVFeed(input: AnalysisInput): Promise<CCTVAnalysis> {
-  const apiKey = process.env.AI_API_KEY || process.env.NEXT_PUBLIC_AI_API_KEY;
-  const customEndpoint = process.env.AI_ENDPOINT_URL || process.env.NEXT_PUBLIC_AI_ENDPOINT_URL;
-  const provider = process.env.AI_MODEL_PROVIDER || 'simulation_engine';
+  // Server-only secrets. Never read NEXT_PUBLIC_* here: those are shipped to the browser.
+  // Call this only from server code (app/api/cctv/analyze).
+  const apiKey = process.env.AI_API_KEY;
+  const customEndpoint = process.env.AI_ENDPOINT_URL;
 
   // 1. If custom endpoint is configured
   if (customEndpoint && apiKey) {

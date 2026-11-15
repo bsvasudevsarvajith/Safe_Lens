@@ -25,10 +25,11 @@ export default function SOSModal({
 
   if (!isOpen) return null;
 
-  const mapLink = sosEvent?.mapLink || `https://maps.google.com/?q=${sosEvent?.latitude || 12.9716},${sosEvent?.longitude || 77.5946}`;
+  const locationKnown = Boolean(sosEvent) && sosEvent?.locationSource !== 'unavailable';
+  const mapLink = locationKnown ? sosEvent?.mapLink ?? '' : '';
 
   const handleCopyLink = () => {
-    if (navigator.clipboard) {
+    if (mapLink && navigator.clipboard) {
       navigator.clipboard.writeText(mapLink);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
@@ -96,12 +97,17 @@ export default function SOSModal({
               <div className="truncate">
                 <div className="text-xs text-slate-400">Exact GPS Coordinates</div>
                 <div className="text-sm font-mono font-medium text-slate-100 truncate">
-                  {sosEvent ? `${sosEvent.latitude.toFixed(5)}, ${sosEvent.longitude.toFixed(5)} (±${Math.round(sosEvent.accuracyMeters)}m)` : 'Locating satellite fix...'}
+                  {!sosEvent
+                    ? 'Locating satellite fix...'
+                    : locationKnown
+                      ? `${sosEvent.latitude.toFixed(5)}, ${sosEvent.longitude.toFixed(5)} (±${Math.round(sosEvent.accuracyMeters)}m)`
+                      : 'Location unavailable — tell the operator where you are'}
                 </div>
               </div>
             </div>
             <button
               onClick={handleCopyLink}
+              disabled={!mapLink}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-xs font-semibold rounded-xl text-slate-200 transition shrink-0"
             >
               {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
@@ -112,7 +118,7 @@ export default function SOSModal({
           {/* Notified Contacts preview */}
           {sosEvent?.notifiedContacts && sosEvent.notifiedContacts.length > 0 && (
             <div className="p-3 bg-slate-800/50 rounded-2xl border border-slate-700/40 text-xs text-slate-300">
-              <span className="font-semibold text-slate-200 block mb-1">Emergency Contacts Notified:</span>
+              <span className="font-semibold text-slate-200 block mb-1">Emergency contacts on file (not yet messaged automatically):</span>
               <ul className="space-y-0.5">
                 {sosEvent.notifiedContacts.map((c, i) => (
                   <li key={i} className="text-slate-400">• {c}</li>

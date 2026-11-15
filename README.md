@@ -160,8 +160,20 @@ See `.env.example` for the complete list of options:
 3. Configure environment variables in Vercel Project Settings from your `.env.local`.
 4. Deploy!
 
-### Firebase Production Rules
-Deploy the included `firebase/firestore.rules` via the Firebase CLI:
-```bash
-firebase deploy --only firestore:rules
-```
+### Demo mode vs. Firebase mode
+- **Demo mode** (no `NEXT_PUBLIC_FIREBASE_*` keys): all data is kept in the browser's `localStorage`, seeded from `lib/mockData`. Persona switching and password-less demo login are enabled. Nothing is shared between devices, so **never deploy publicly in demo mode**.
+- **Firebase mode** (keys set): all data is stored in Cloud Firestore and shared across devices. Login requires a real Firebase email/password account, and persona switching is disabled.
+
+### Setting up Firebase
+1. In the [Firebase console](https://console.firebase.google.com), create a project, add a **Web app**, and copy its config into `.env.local` (`NEXT_PUBLIC_FIREBASE_*`).
+2. Enable **Authentication → Email/Password** and create a **Cloud Firestore** database.
+3. Deploy the security rules (`firebase.json` points at `firebase/firestore.rules`):
+   ```bash
+   npx firebase-tools login
+   npx firebase-tools use --add
+   npx firebase-tools deploy --only firestore:rules
+   ```
+4. Register your first account in the app, then in the Firestore console open `users/{your uid}` and change `role` to `admin`. Admins can then promote other users from the admin dashboard.
+5. Cameras, safety zones and settings show the built-in defaults until an admin edits them; the first edit saves them to Firestore.
+
+SOS events from signed-out users are allowed but must use a userId starting with `anonymous`. Signed-out users cannot read SOS events back.

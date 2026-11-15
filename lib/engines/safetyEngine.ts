@@ -47,7 +47,7 @@ export class ManualSafetyEngine implements SafetyScoreEngine {
   readonly description = 'Calculates safety based on admin-defined safety zones, verified threat density, and road infrastructure ratings.';
 
   async calculateSegmentScore(segment: RouteSegment, context: EngineContext): Promise<SegmentScoreResult> {
-    let score = segment.baseSafetyScore || 70;
+    let score = segment.baseSafetyScore ?? 70;
     const warnings: string[] = [];
 
     // Lighting factor
@@ -63,8 +63,9 @@ export class ManualSafetyEngine implements SafetyScoreEngine {
     // Zone correlation
     let zoneBonus = 0;
     for (const zone of context.safetyZones.filter(z => z.active)) {
-      const dist = calculateDistance(segment.from.lat, segment.from.lng, zone.center.lat, zone.center.lng);
-      if (dist <= zone.radiusMeters) {
+      const dFrom = calculateDistance(segment.from.lat, segment.from.lng, zone.center.lat, zone.center.lng);
+      const dTo = calculateDistance(segment.to.lat, segment.to.lng, zone.center.lat, zone.center.lng);
+      if (Math.min(dFrom, dTo) <= zone.radiusMeters) {
         if (zone.type === 'safe_corridor' || zone.type === 'police_patrol_sector') {
           zoneBonus += 12;
         } else if (zone.type === 'caution_zone') {
@@ -190,9 +191,11 @@ export class AiCctvSafetyEngine implements SafetyScoreEngine {
     let lightingBonus = 0;
     let anomalyPenalty = 0;
 
+    let analysedCount = 0;
     if (nearbyCameras.length > 0) {
       surveillanceScore = 20; // Verified active CCTV monitoring
       for (const cam of nearbyCameras) {
+        if (cam.lastAnalysis) analysedCount++;
         if (cam.lastAnalysis) {
           const analysis = cam.lastAnalysis;
           // Lighting from AI
@@ -220,6 +223,13 @@ export class AiCctvSafetyEngine implements SafetyScoreEngine {
           }
         }
       }
+      // Average lighting/crowd across cameras so the score doesn't scale with camera count.
+      // An anomaly on ANY camera still applies its full penalty (once).
+      if (analysedCount > 0) {
+        lightingBonus = Math.round(lightingBonus / analysedCount);
+        crowdFactor = Math.round(crowdFactor / analysedCount);
+      }
+      anomalyPenalty = Math.min(anomalyPenalty, 28);
     } else {
       warnings.push(`Unmonitored corridor: No active CCTV feed on ${segment.roadName}`);
     }
@@ -269,7 +279,8 @@ export class AiCctvSafetyEngine implements SafetyScoreEngine {
       if (res.factors.surveillance > 0) {
         cctvMonitoredDistance += weight;
       }
-      if (res.factors.lighting >= 0) {
+      // Only count as lit when a camera actually observed adequate lighting
+      if (res.factors.surveillance > 0 && res.factors.lighting > 0) {
         litDistance += weight;
       }
       if (res.factors.hazardPenalty > 0) {
@@ -334,10 +345,14 @@ export class HybridSafetyEngine implements SafetyScoreEngine {
     return {
       overallScore,
       tierLevel,
-      segmentScores: ai.segmentScores,
+      // Report blended per-segment scores, consistent with overallScore
+      segmentScores: await Promise.all(segments.map(seg => this.calculateSegmentScore(seg, context))),
       cctvCoveragePercent: ai.cctvCoveragePercent,
       wellLitPercent: Math.max(ai.wellLitPercent, manual.wellLitPercent),
-      hazardCount: ai.hazardCount + manual.hazardCount,
+      // Count each segment once, whether either engine flagged it
+      hazardCount: ai.segmentScores.filter(
+        (s, i) => s.factors.hazardPenalty > 0 || manual.segmentScores[i]?.factors.hazardPenalty > 0
+      ).length,
       summary: `Hybrid Engine: ${overallScore}/100 safety score. Synchronized AI CCTV feeds with verified municipal threat grid.`,
     };
   }

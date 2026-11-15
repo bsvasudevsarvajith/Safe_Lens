@@ -2,7 +2,9 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ---------------------------------------------------------------
     // Helper functions
+    // ---------------------------------------------------------------
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -15,6 +17,8 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
+    // Roles can come from a custom claim (set server-side with the Admin SDK)
+    // or from the user's profile document (only admins may change it).
     function isAdmin() {
       return isAuthenticated() && (
         request.auth.token.role == 'admin' ||
@@ -29,48 +33,73 @@ service cloud.firestore {
       );
     }
 
-    // 1. Users Collection
-    // Users can read profiles; users can update their own personal info (name, phone, avatar, emergency contacts)
-    // CRITICAL: Users can NEVER escalate their own role or un-suspend their status!
+    function changedOnly(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    // ---------------------------------------------------------------
+    // 1. Users
+    // Profiles hold phone numbers and emergency contacts: only the owner
+    // and moderators may read them.
+    // CRITICAL: Users can NEVER escalate their own role or un-suspend themselves!
+    // ---------------------------------------------------------------
     match /users/{userId} {
-      allow read: if isAuthenticated();
+      allow read: if isOwner(userId) || isModerator();
       allow create: if isOwner(userId) &&
+        request.resource.data.uid == userId &&
+        request.resource.data.email == request.auth.token.email &&
         request.resource.data.role == 'user' &&
         request.resource.data.status == 'active';
       allow update: if (
-        // Self-update without role/status alteration
         isOwner(userId) &&
-        request.resource.data.role == resource.data.role &&
-        request.resource.data.status == resource.data.status
+        changedOnly(['displayName', 'phoneNumber', 'photoURL', 'emergencyContacts', 'updatedAt'])
       ) || isAdmin();
       allow delete: if isAdmin();
     }
 
-    // 2. Threat Reports Collection
-    // Community can file reports (starting as pending); only moderators/admins can verify or reject
+    // ---------------------------------------------------------------
+    // 2. Threat Reports
+    // Signed-in users file reports as themselves (starting as pending);
+    // only moderators/admins can verify or reject.
+    // ---------------------------------------------------------------
     match /reports/{reportId} {
       allow read: if true;
       allow create: if isAuthenticated() &&
-        request.resource.data.status == 'pending';
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.upvotes == 1;
       allow update: if isModerator() || (
-        // Report author can update description/photo only while still pending
+        // Author may edit only the description/photo, and only while pending
         isOwner(resource.data.userId) &&
         resource.data.status == 'pending' &&
-        request.resource.data.status == 'pending'
+        changedOnly(['description', 'imageUrl', 'updatedAt'])
       );
       allow delete: if isAdmin();
     }
 
-    // 3. SOS Events Collection
-    // Any user (or guest) in distress can trigger SOS
+    // ---------------------------------------------------------------
+    // 3. SOS Events
+    // Anyone in distress (even signed out) can raise an SOS, but cannot
+    // impersonate another user. Locations are visible only to the caller
+    // and to dispatchers.
+    // ---------------------------------------------------------------
     match /sosEvents/{sosId} {
-      allow read: if isAuthenticated();
-      allow create: if true;
+      allow read: if isModerator() ||
+        (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow create: if request.resource.data.status == 'active' &&
+        request.resource.data.latitude is number &&
+        request.resource.data.longitude is number &&
+        (
+          (isAuthenticated() && request.resource.data.userId == request.auth.uid) ||
+          (!isAuthenticated() && request.resource.data.userId.matches('anonymous.*'))
+        );
       allow update: if isModerator();
       allow delete: if isAdmin();
     }
 
+    // ---------------------------------------------------------------
     // 4. CCTV Cameras & CCTV Analysis
+    // ---------------------------------------------------------------
     match /cctvCameras/{cameraId} {
       allow read: if true;
       allow write: if isModerator();
@@ -82,26 +111,33 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ---------------------------------------------------------------
     // 5. Safety Zones & Routes
+    // ---------------------------------------------------------------
     match /safetyZones/{zoneId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
+    // Not used by the app yet; locked until it is.
     match /routes/{routeId} {
       allow read: if true;
-      allow write: if isAuthenticated();
+      allow write: if false;
     }
 
+    // ---------------------------------------------------------------
     // 6. System Settings & Audit Logs
+    // ---------------------------------------------------------------
     match /systemSettings/{settingId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
+    // Entries are always attributed to the signed-in user who wrote them
     match /adminLogs/{logId} {
       allow read: if isModerator();
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+        request.resource.data.adminId == request.auth.uid;
       allow update, delete: if false; // Immutable audit log
     }
   }

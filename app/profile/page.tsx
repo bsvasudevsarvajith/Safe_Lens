@@ -70,12 +70,14 @@ function ProfileContent() {
 
   // Load user activity records
   useEffect(() => {
-    Promise.all([getSOSEvents(), getThreatReports()]).then(([allSOS, allReports]) => {
-      if (user) {
-        setMySOSEvents(allSOS.filter(s => s.userId === user.uid || s.userPhone === user.phoneNumber));
-        setMyReports(allReports.filter(r => r.userId === user.uid));
-      }
-    });
+    if (user) {
+      Promise.all([getSOSEvents(user.uid), getThreatReports()])
+        .then(([mySOS, allReports]) => {
+          setMySOSEvents(mySOS);
+          setMyReports(allReports.filter(r => r.userId === user.uid));
+        })
+        .catch(err => console.error('Could not load activity:', err));
+    }
 
     if (typeof window !== 'undefined') {
       try {

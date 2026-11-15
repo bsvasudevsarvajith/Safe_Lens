@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { UserProfile, UserRole } from '@/types';
 import { getCurrentUser, loginUser, logoutUser, registerUser, switchPersona } from '@/services/firebase/authService';
 import { updateUserSelfProfile } from '@/services/firebase/firestoreService';
+import { isDemoMode } from '@/services/firebase/firebaseClient';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -11,6 +12,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isModerator: boolean;
   isAuthenticated: boolean;
+  isDemoMode: boolean;
   login: (email: string, password?: string) => Promise<void>;
   register: (email: string, displayName: string, phoneNumber?: string, password?: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -95,6 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAdmin,
         isModerator,
         isAuthenticated,
+        isDemoMode,
         login,
         register,
         logout,
