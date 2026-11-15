@@ -1,5 +1,5 @@
 import { UserProfile, UserRole } from '@/types';
-import { getAllUsers, getUserProfile } from './firestoreService';
+import { createUserProfile, getAllUsers, getUserProfile } from './firestoreService';
 import { auth, isDemoMode, isFirebaseConfigured } from './firebaseClient';
 import {
   signInWithEmailAndPassword,
@@ -8,13 +8,28 @@ import {
   sendPasswordResetEmail,
 } from 'firebase/auth';
 
+// Demo mode only: id of the "signed-in" local user
 const CURRENT_USER_KEY = 'sr_current_user_id';
 
 export async function getCurrentUser(): Promise<UserProfile | null> {
   if (typeof window === 'undefined') return null;
+
+  if (isFirebaseConfigured) {
+    // The signed-in user comes from Firebase Auth (restored from its own session store)
+    if (!auth) return null;
+    await auth.authStateReady();
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) return null;
+    const profile = await getUserProfile(firebaseUser.uid);
+    if (!profile || profile.status === 'suspended') {
+      await signOut(auth);
+      return null;
+    }
+    return profile;
+  }
+
   const currentUid = localStorage.getItem(CURRENT_USER_KEY);
   if (!currentUid) {
-    if (!isDemoMode) return null;
     // Demo only: default to the demo user for smooth immediate first-run evaluation
     const users = await getAllUsers();
     const defaultUser = users.find(u => u.role === 'user') || users[0];
@@ -39,12 +54,14 @@ export async function loginUser(email: string, password?: string): Promise<UserP
       throw new Error('Invalid email or password credentials.');
     }
     const profile = await getUserProfile(uid);
-    if (!profile) throw new Error('No profile found for this account.');
+    if (!profile) {
+      await signOut(auth);
+      throw new Error('No profile found for this account.');
+    }
     if (profile.status === 'suspended') {
       await signOut(auth);
       throw new Error('Account suspended. Please contact administrator.');
     }
-    localStorage.setItem(CURRENT_USER_KEY, profile.uid);
     return profile;
   }
 
@@ -62,24 +79,34 @@ export async function loginUser(email: string, password?: string): Promise<UserP
   throw new Error('Invalid email or password credentials.');
 }
 
+const FIREBASE_REGISTER_ERRORS: Record<string, string> = {
+  'auth/email-already-in-use': 'An account with this email address already exists.',
+  'auth/weak-password': 'Password must be at least 6 characters.',
+  'auth/invalid-email': 'Please enter a valid email address.',
+};
+
 export async function registerUser(email: string, displayName: string, phoneNumber?: string, password?: string): Promise<UserProfile> {
   let uid = `usr-${Date.now()}`;
 
-  // Check for duplicates BEFORE creating any auth account, to avoid orphans
-  const allUsers = await getAllUsers();
-  const exists = allUsers.some(u => u.email.toLowerCase() === email.toLowerCase());
-  if (exists) {
-    throw new Error('An account with this email address already exists.');
-  }
-
   if (isFirebaseConfigured) {
     if (!auth || !password) throw new Error('A password is required to register.');
-    // Let Firebase errors (weak password, email in use, ...) reach the user
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
-    uid = cred.user.uid;
+    // Firebase Auth itself rejects duplicate emails
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      uid = cred.user.uid;
+    } catch (err) {
+      const code = (err as { code?: string }).code ?? '';
+      throw new Error(FIREBASE_REGISTER_ERRORS[code] ?? 'Registration failed. Please try again.');
+    }
+  } else {
+    // Demo mode: check the local store for duplicates
+    const allUsers = await getAllUsers();
+    if (allUsers.some(u => u.email.toLowerCase() === email.toLowerCase())) {
+      throw new Error('An account with this email address already exists.');
+    }
   }
 
-  // Security: New registrations are ALWAYS role 'user'
+  // Security: New registrations are ALWAYS role 'user' (also enforced by Firestore rules)
   const newUser: UserProfile = {
     uid,
     email,
@@ -92,9 +119,8 @@ export async function registerUser(email: string, displayName: string, phoneNumb
     updatedAt: new Date().toISOString(),
   };
 
-  allUsers.push(newUser);
-  localStorage.setItem('sr_users', JSON.stringify(allUsers));
-  localStorage.setItem(CURRENT_USER_KEY, newUser.uid);
+  await createUserProfile(newUser);
+  if (!isFirebaseConfigured) localStorage.setItem(CURRENT_USER_KEY, newUser.uid);
 
   return newUser;
 }
@@ -116,10 +142,11 @@ export async function requestPasswordReset(email: string): Promise<boolean> {
   if (isFirebaseConfigured && auth) {
     try {
       await sendPasswordResetEmail(auth, email);
-      return true;
     } catch (err) {
+      // Don't reveal whether the email exists
       console.warn('Firebase reset email failed:', err);
     }
+    return true;
   }
   // Simulated success response for development
   return true;

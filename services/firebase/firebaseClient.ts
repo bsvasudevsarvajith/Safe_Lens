@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 
 const firebaseConfig = {
@@ -26,11 +26,15 @@ let auth: Auth | null = null;
 let db: Firestore | null = null;
 let storage: FirebaseStorage | null = null;
 
-if (typeof window !== 'undefined' && isFirebaseConfigured) {
+// Initialised in the browser AND on the server (API routes). On the server there is
+// no signed-in user, so API routes only get what the rules allow the public.
+if (isFirebaseConfigured) {
   try {
-    app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+    const isNew = !getApps().length;
+    app = isNew ? initializeApp(firebaseConfig) : getApp();
     auth = getAuth(app);
-    db = getFirestore(app);
+    // Firestore rejects `undefined` field values; drop them instead of failing writes
+    db = isNew ? initializeFirestore(app, { ignoreUndefinedProperties: true }) : getFirestore(app);
     storage = getStorage(app);
   } catch (err) {
     console.warn('Firebase initialization error, operating in resilient offline/sandbox mode', err);
